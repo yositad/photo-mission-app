@@ -30,7 +30,26 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Photo Mission App to use your location to find missions near you."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Photo Mission App to access your camera to take photos for missions."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Photo Mission App to save photos to your library.",
+          "savePhotosPermission": "Allow Photo Mission App to save photos to your library."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
