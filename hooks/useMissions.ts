@@ -4,7 +4,8 @@ import {
     loadMissions,
     addMissionToStore,
     updateMissionInStore,
-    deleteMissionFromStore
+    deleteMissionFromStore,
+    saveMissions
 } from '../stores/missionStore';
 
 export const useMissions = () => {
@@ -39,7 +40,23 @@ export const useMissions = () => {
     const completeMission = async (id: string, photoUri: string, assetId?: string) => {
         const mission = missions.find((m) => m.id === id);
         if (mission) {
-            const updatedMission = { ...mission, isCompleted: true, photoUri, assetId };
+            const currentPhotos = mission.photos || [];
+            if (currentPhotos.length >= 5) {
+                // Should be prevented by UI, but safety check
+                return;
+            }
+
+            const newPhoto = { uri: photoUri, assetId, createdAt: Date.now() };
+            const updatedPhotos = [...currentPhotos, newPhoto];
+
+            const updatedMission = {
+                ...mission,
+                isCompleted: true,
+                photos: updatedPhotos,
+                // Keep legacy fields in sync for now if needed, or just ignore them
+                photoUri: updatedPhotos[0].uri,
+                assetId: updatedPhotos[0].assetId
+            };
             const updatedList = await updateMissionInStore(updatedMission);
             setMissions(updatedList);
         }
@@ -50,5 +67,44 @@ export const useMissions = () => {
         setMissions(updatedList);
     }
 
-    return { missions, isLoading, addMission, completeMission, deleteMission, refreshMissions };
+    const importMissions = async (newMissions: Mission[]) => {
+        await saveMissions(newMissions);
+        setMissions(newMissions);
+    };
+
+    const reorderMissions = async (newMissions: Mission[]) => {
+        setMissions(newMissions); // Optimistic
+        await saveMissions(newMissions);
+    };
+
+    const deletePhoto = async (missionId: string, photoUri: string) => {
+        const mission = missions.find((m) => m.id === missionId);
+        if (mission && mission.photos) {
+            const updatedPhotos = mission.photos.filter((p) => p.uri !== photoUri);
+            const isCompleted = updatedPhotos.length > 0;
+
+            const updatedMission = {
+                ...mission,
+                isCompleted,
+                photos: updatedPhotos,
+                // Sync legacy fields
+                photoUri: updatedPhotos.length > 0 ? updatedPhotos[0].uri : undefined,
+                assetId: updatedPhotos.length > 0 ? updatedPhotos[0].assetId : undefined,
+            };
+
+            const updatedList = await updateMissionInStore(updatedMission);
+            setMissions(updatedList);
+        }
+    };
+
+    const saveMissionNote = async (id: string, note: string) => {
+        const mission = missions.find((m) => m.id === id);
+        if (mission) {
+            const updatedMission = { ...mission, note };
+            const updatedList = await updateMissionInStore(updatedMission);
+            setMissions(updatedList);
+        }
+    };
+
+    return { missions, isLoading, addMission, completeMission, deleteMission, refreshMissions, importMissions, reorderMissions, deletePhoto, saveMissionNote };
 };

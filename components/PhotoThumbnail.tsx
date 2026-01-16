@@ -10,52 +10,47 @@ type PhotoThumbnailProps = {
     photoUri: string;
     missionName: string;
     assetId?: string;
+    onPress?: () => void;
+    onLongPress?: () => void;
+    selected?: boolean;
+    selectionMode?: boolean;
 };
 
-export const PhotoThumbnail: React.FC<PhotoThumbnailProps> = ({ photoUri, missionName, assetId }) => {
+import { useMissionImage } from '../hooks/useMissionImage';
+
+export const PhotoThumbnail: React.FC<PhotoThumbnailProps> = ({
+    photoUri,
+    missionName,
+    assetId,
+    onPress,
+    onLongPress,
+    selected,
+    selectionMode
+}) => {
     const router = useRouter();
-    // If it's a ph:// URI, don't try to render it directly. Wait for resolution.
-    const [imageUri, setImageUri] = useState<string | null>(
-        photoUri.startsWith('ph://') ? null : photoUri
-    );
+    const imageUri = useMissionImage(photoUri, assetId);
 
-    useEffect(() => {
-        const resolveUri = async () => {
-            if (photoUri.startsWith('ph://')) {
-                if (assetId) {
-                    try {
-                        const assetInfo = await MediaLibrary.getAssetInfoAsync(assetId);
-                        if (assetInfo?.localUri) {
-                            setImageUri(assetInfo.localUri);
-                        } else {
-                            // Could not resolve
-                            console.warn('Could not resolve asset URI');
-                        }
-                    } catch (e) {
-                        console.error('Failed to resolve asset URI for display', e);
-                    }
-                }
-            } else {
-                setImageUri(photoUri);
-            }
-        };
-        resolveUri();
-    }, [assetId, photoUri]);
-
-    const openPhoto = () => {
-        if (!imageUri) {
-            Alert.alert('Error', 'Image not available');
+    const handlePress = () => {
+        if (onPress) {
+            onPress();
             return;
         }
-        // Encode the URI to ensure it passes correctly as a query param
-        const encodedUri = encodeURIComponent(imageUri);
-        router.push({ pathname: '/photo-view', params: { uri: encodedUri } });
+        if (imageUri) {
+            const encodedUri = encodeURIComponent(imageUri);
+            router.push({ pathname: '/photo-view', params: { uri: encodedUri } });
+        }
     };
 
     return (
-        <TouchableOpacity onPress={openPhoto} style={styles.container}>
+        <TouchableOpacity
+            onPress={handlePress}
+            onLongPress={onLongPress}
+            style={styles.container}
+            activeOpacity={0.7}
+            disabled={false}
+        >
             {imageUri ? (
-                <Image source={{ uri: imageUri }} style={styles.image} />
+                <Image source={{ uri: imageUri }} style={[styles.image, selected && styles.selectedImage]} />
             ) : (
                 <View style={[styles.image, styles.placeholder]}>
                     <MaterialIcons name="image-not-supported" size={24} color="#999" />
@@ -70,16 +65,17 @@ export const PhotoThumbnail: React.FC<PhotoThumbnailProps> = ({ photoUri, missio
 
 const styles = StyleSheet.create({
     container: {
-        width: '32%',
-        aspectRatio: 1,
-        marginBottom: '1.5%',
-        marginRight: '1.3%',
+        width: '100%',
+        height: '100%',
         position: 'relative',
     },
     image: {
         width: '100%',
         height: '100%',
         borderRadius: 4,
+    },
+    selectedImage: {
+        opacity: 0.7,
     },
     placeholder: {
         backgroundColor: '#eee',

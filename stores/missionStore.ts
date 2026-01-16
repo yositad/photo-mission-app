@@ -1,14 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export type PhotoData = {
+    uri: string;
+    assetId?: string;
+    createdAt?: number;
+};
+
 export type Mission = {
     id: string;
     name: string;
     caption?: string;
+    note?: string;
     latitude: number;
     longitude: number;
     isCompleted: boolean;
-    photoUri?: string;
-    assetId?: string;
+    photoUri?: string; // Legacy
+    assetId?: string; // Legacy
+    photos?: PhotoData[];
     createdAt: number;
 };
 
@@ -26,7 +34,23 @@ export const saveMissions = async (missions: Mission[]): Promise<void> => {
 export const loadMissions = async (): Promise<Mission[]> => {
     try {
         const jsonValue = await AsyncStorage.getItem(MISSIONS_KEY);
-        return jsonValue != null ? JSON.parse(jsonValue) : [];
+        if (jsonValue != null) {
+            const missions: Mission[] = JSON.parse(jsonValue);
+            // Migrate old data
+            return missions.map(m => {
+                if (!m.photos && m.photoUri) {
+                    return {
+                        ...m,
+                        photos: [{ uri: m.photoUri, assetId: m.assetId, createdAt: m.createdAt }]
+                    };
+                }
+                if (!m.photos) {
+                    return { ...m, photos: [] };
+                }
+                return m;
+            });
+        }
+        return [];
     } catch (e) {
         console.error('Failed to load missions', e);
         return [];
@@ -49,10 +73,9 @@ export const updateMissionInStore = async (updatedMission: Mission): Promise<Mis
     return newMissions;
 };
 
-
 export const deleteMissionFromStore = async (id: string): Promise<Mission[]> => {
     const currentMissions = await loadMissions();
     const newMissions = currentMissions.filter((m) => m.id !== id);
     await saveMissions(newMissions);
     return newMissions;
-}
+};

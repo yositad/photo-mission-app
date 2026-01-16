@@ -1,123 +1,96 @@
-import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, Text } from 'react-native';
-import { Link, useRouter, useFocusEffect } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import React from 'react';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useMissions } from '../../hooks/useMissions';
 import { useLocation } from '../../hooks/useLocation';
-import { MissionCard } from '../../components/MissionCard';
-import { calculateDistance } from '../../utils/distance';
 
-export default function MissionListScreen() {
-  const router = useRouter();
-  const { missions, isLoading, refreshMissions, deleteMission } = useMissions();
-  const { location, errorMsg } = useLocation();
+export default function MissionMapTab() {
+    const { missions, isLoading } = useMissions();
+    const { location } = useLocation();
 
-  useFocusEffect(
-    useCallback(() => {
-      refreshMissions();
-    }, [refreshMissions])
-  );
+    if (isLoading) {
+        return (
+            <View style={[styles.container, styles.center]}>
+                <ActivityIndicator size="large" />
+            </View>
+        );
+    }
 
-  const handlePressCamera = (id: string) => {
-    router.push(`/camera/${id}`);
-  };
+    let initialRegion = {
+        latitude: 35.681236,
+        longitude: 139.767125, // Tokyo Station default
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+    };
 
-  const handleDelete = (id: string) => {
-    deleteMission(id);
-  }
+    if (missions.length > 0) {
+        const latitudes = missions.map(m => m.latitude);
+        const longitudes = missions.map(m => m.longitude);
+        const minLat = Math.min(...latitudes);
+        const maxLat = Math.max(...latitudes);
+        const minLon = Math.min(...longitudes);
+        const maxLon = Math.max(...longitudes);
 
-  if (isLoading) {
+        // Center
+        const midLat = (minLat + maxLat) / 2;
+        const midLon = (minLon + maxLon) / 2;
+
+        // Deltas with some padding (multiply by 1.2 or similar)
+        // Ensure minimum zoom so it doesn't look too zoomed in on a single point
+        const latDelta = Math.max((maxLat - minLat) * 1.5, 0.01);
+        const lonDelta = Math.max((maxLon - minLon) * 1.5, 0.01);
+
+        initialRegion = {
+            latitude: midLat,
+            longitude: midLon,
+            latitudeDelta: latDelta,
+            longitudeDelta: lonDelta,
+        };
+    } else if (location) {
+        initialRegion = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+        };
+    }
+
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
+        <View style={styles.container}>
+            <MapView
+                style={styles.map}
+                provider={PROVIDER_GOOGLE}
+                showsUserLocation={true}
+                showsMyLocationButton={true}
+                initialRegion={initialRegion}
+            >
+                {missions.map((mission) => (
+                    <Marker
+                        key={mission.id}
+                        coordinate={{
+                            latitude: mission.latitude,
+                            longitude: mission.longitude,
+                        }}
+                        title={mission.name}
+                        description={mission.caption}
+                        pinColor={mission.isCompleted ? 'green' : 'red'}
+                    />
+                ))}
+            </MapView>
+        </View>
     );
-  }
-
-  return (
-    <View style={styles.container}>
-      {errorMsg && <Text style={styles.error}>{errorMsg}</Text>}
-
-      <FlatList
-        data={missions}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => {
-          let distance = 0;
-          let isWithinRange = false;
-
-          if (location) {
-            distance = calculateDistance(
-              location.coords.latitude,
-              location.coords.longitude,
-              item.latitude,
-              item.longitude
-            );
-            isWithinRange = distance <= 50;
-          }
-
-          return (
-            <MissionCard
-              mission={item}
-              currentLat={location?.coords.latitude ?? null}
-              currentLon={location?.coords.longitude ?? null}
-              distance={distance}
-              isWithinRange={isWithinRange}
-              onPressCamera={handlePressCamera}
-              onDelete={handleDelete}
-            />
-          );
-        }}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>No missions yet. Add one!</Text>
-        }
-      />
-
-      <Link href="/add-mission" asChild>
-        <MaterialIcons
-          name="add-circle"
-          size={64}
-          color="#007AFF"
-          style={styles.fab}
-        />
-      </Link>
-    </View>
-  );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  list: {
-    padding: 16,
-    paddingBottom: 100, // Space for FAB
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  error: {
-    color: 'red',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 40,
-    color: '#888',
-    fontSize: 16,
-  },
+    container: {
+        flex: 1,
+    },
+    map: {
+        width: '100%',
+        height: '100%',
+    },
+    center: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    }
 });

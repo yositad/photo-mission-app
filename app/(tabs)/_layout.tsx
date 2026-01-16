@@ -14,6 +14,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          title: 'Map',
+          tabBarIcon: ({ color }) => <MaterialIcons name="map" size={28} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="list"
+        options={{
           title: 'Missions',
           tabBarIcon: ({ color }) => <MaterialIcons name="list" size={28} color={color} />,
         }}
